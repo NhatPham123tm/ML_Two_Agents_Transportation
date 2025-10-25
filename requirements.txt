@@ -1,0 +1,19 @@
+# Core scientific and data libraries
+numpy>=1.26
+pandas>=2.2
+
+# Visualization and animation
+matplotlib>=3.9
+pygame>=2.6
+imageio>=2.35
+
+# Experiment and configuration utilities
+pyyaml>=6.0
+tqdm>=4.66
+
+# Optional extras for pathfinding and reporting
+networkx>=3.4
+plotly>=5.24
+
+# Environment
+python-dotenv>=1.0
