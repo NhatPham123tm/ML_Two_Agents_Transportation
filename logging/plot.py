@@ -1,0 +1,1 @@
+# auto‑assemble plots/tables for PDF
