@@ -30,7 +30,6 @@ try:
 except Exception:
     VIZ_OK = False
 
-print(VIZ_OK)
 DEFAULT_OBSTACLES = {(2, 3), (2, 4), (3, 4)}
 DEFAULT_PICKUPS   = {(0, 0): 2, (5, 0): 1}
 DEFAULT_DROPS     = [(5, 7)]
@@ -150,12 +149,9 @@ def run_single(
         maxq = max([0.0]+[float(v) for v in Q.values()])
         return nonzero, maxq
 
-    nzF, maxF = q_stats(aF.Q)
-    nzM, maxM = q_stats(aM.Q)
-    print(f"QF: nonzero={nzF}, max={maxF:.3f} | QM: nonzero={nzM}, max={maxM:.3f}")
-
     # Make visuals (if viz modules available)
     if VIZ_OK:
+        print("Generating visual output ...")
         make_visuals(
             outdir=outdir,
             env_spec=meta["world"],   # we already built this dict above
@@ -173,6 +169,7 @@ def run_single(
     }
 
 def main():
+    print("Bulding PDWorld ...")
     parser = argparse.ArgumentParser(description="Experiment 1 (Q-learning, warmup PRANDOM, variants a/b/c)")
     parser.add_argument("--variant", choices=["a","b","c"], required=True,
                         help="a: PRANDOM→PRANDOM, b: PRANDOM→PGREEDY, c: PRANDOM→PEXPLOIT")
@@ -193,6 +190,7 @@ def main():
         raise SystemExit("Provide at least --runs seeds for both --seedF and --seedM")
     
     os.makedirs(args.outroot, exist_ok=True)
+    print("Running Agents ...")
     for i in range(args.runs):
         outdir = os.path.join(args.outroot, f"exp1{args.variant}_run{i+1}")
         res = run_single(

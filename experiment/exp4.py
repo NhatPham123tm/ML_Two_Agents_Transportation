@@ -198,6 +198,7 @@ def run_single(
     # Optional visuals (heatmaps, quiver, overlays, animation)
     if MAKE_VIS:
         try:
+            print("Generating visual output ...")
             MAKE_VIS(outdir, meta["world"], aF.Q, aM.Q)
         except Exception as e:
             viz_dir = os.path.join(outdir, "viz"); os.makedirs(viz_dir, exist_ok=True)
@@ -218,6 +219,7 @@ def run_single(
 
 
 def main():
+    print("Bulding PDWorld ...")
     ap = argparse.ArgumentParser(description="Experiment 4: adapt to changed pickup locations after 3 terminals")
     ap.add_argument("--algo", choices=["qlearning","sarsa"], default="qlearning",
                     help="Base algorithm")
@@ -243,6 +245,7 @@ def main():
     os.makedirs(batch_root, exist_ok=True)
 
     rows = []
+    print("Running Agents ...")
     for i in range(args.runs):
         outdir = os.path.join(batch_root, f"{args.algo}_run{i+1}")
         print(f"[exp4] {args.algo} run{i+1} → {outdir}")

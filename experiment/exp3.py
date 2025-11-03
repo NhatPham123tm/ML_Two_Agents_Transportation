@@ -139,6 +139,7 @@ def _run_single_alpha(outdir, algo, alpha, gamma, steps, warmup, seedF, seedM, w
     # Optional visuals
     if MAKE_VIS:
         try:
+            print("Generating visual output ...")
             MAKE_VIS(outdir, meta_world, aF.Q, aM.Q)
         except Exception as e:
             with open(os.path.join(outdir, "viz", "_viz_error.txt"), "w", encoding="utf-8") as f:
@@ -152,6 +153,7 @@ def _run_single_alpha(outdir, algo, alpha, gamma, steps, warmup, seedF, seedM, w
     return {"outdir": outdir, "nzF": nonzeroF, "nzM": nonzeroM, "maxF": maxF, "maxM": maxM}
 
 def main():
+    print("Bulding PDWorld ...")
     ap = argparse.ArgumentParser(description="Experiment 3: compare α=0.15 vs α=0.45 for Q-learning or SARSA")
     ap.add_argument("--algo", choices=["qlearning","sarsa"], default="qlearning",
                     help="Base algorithm to replicate (default: qlearning like Exp 1.c)")
@@ -179,6 +181,7 @@ def main():
     os.makedirs(batch_root, exist_ok=True)
 
     summary_rows = []
+    print("Running Agents ...")
     for alpha in args.alphas:
         for i in range(args.runs):
             folder = os.path.join(batch_root, f"{args.algo}_a{str(alpha).replace('.','')}_run{i+1}")

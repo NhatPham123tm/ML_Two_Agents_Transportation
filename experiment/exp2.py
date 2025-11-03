@@ -136,18 +136,10 @@ def run_single(
         json.dump(q_to_json(aF.Q), f, indent=2)
     with open(os.path.join(outdir, "qtable_M.json"), "w", encoding="utf-8") as f:
         json.dump(q_to_json(aM.Q), f, indent=2)
-
-    def q_stats(Q):
-        nonzero = sum(1 for v in Q.values() if abs(v) > 1e-9)
-        maxq = max([0.0]+[float(v) for v in Q.values()])
-        return nonzero, maxq
-
-    nzF, maxF = q_stats(aF.Q)
-    nzM, maxM = q_stats(aM.Q)
-    print(f"QF: nonzero={nzF}, max={maxF:.3f} | QM: nonzero={nzM}, max={maxM:.3f}")
     
     # Optional visuals (heatmaps, quiver, overlays, animation) if your helper is present
     if VIZ_OK:
+        print("Generating visual output ...")
         make_visuals(outdir, meta_world, aF.Q, aM.Q)
 
     return {
@@ -160,6 +152,7 @@ def run_single(
 
 
 def main():
+    print("Bulding PDWorld ...")
     ap = argparse.ArgumentParser(description="Experiment 2 (SARSA: PRANDOM warmup → PEXPLOIT)")
     ap.add_argument("--runs", type=int, default=2, help="number of independent runs (default 2)")
     ap.add_argument("--steps", type=int, default=8000)
@@ -175,7 +168,7 @@ def main():
     args = ap.parse_args()
 
     os.makedirs(args.outroot, exist_ok=True)
-    
+    print("Running Agents ...")
     for i in range(args.runs):
         outdir = os.path.join(args.outroot, f"exp2_run{i+1}")
         res = run_single(
