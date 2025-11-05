@@ -166,12 +166,14 @@ def q_heatmap(Q: Dict,
     fig, ax = plt.subplots(figsize=(6, 6))
     if finite.any():
         data = Z[finite]
+        vmin, vmax = float(np.min(data)), float(np.max(data))
+
         if percentile_clip is not None and len(data) > 4:
             lo, hi = np.percentile(data, percentile_clip)
-            data = np.clip(data, lo, hi)
-            vmin, vmax = float(np.min(data)), float(np.max(data))
-        else:
-            vmin, vmax = float(np.min(data)), float(np.max(data))
+            # Only clip if the percentile range is valid
+            if lo < hi:
+                vmin, vmax = lo, hi
+
         if vmin == vmax:
             vmin, vmax = vmin - 1e-6, vmax + 1e-6
 
