@@ -35,9 +35,12 @@ class QLearningAgent(BaseAgent):
         _sp, r, info = env.step(self.agent_id, a)
         s_prime = st.build_state_from_env(env, self.agent_id)  # re-encode from new env state
         applicable_next = env.applicable_actions(self.agent_id)
+        
         max_next = 0.0
-        if applicable_next:
+        # The value of the next state is 0 if it's a terminal state.
+        if applicable_next and not info.get("terminal"):
             max_next = max(self.Q[(s_prime, ap)] for ap in applicable_next)
+
         td_target = r + self.gamma * max_next
         td = td_target - self.Q[(s, a)]
         self.Q[(s, a)] += self.alpha * td
@@ -46,27 +49,37 @@ class QLearningAgent(BaseAgent):
 class SarsaAgent(BaseAgent):
     def __init__(self, agent_id: str, alpha: float, gamma: float, seed: Optional[int] = None, policy_name: str = 'PEXPLOIT'):
         super().__init__(agent_id, alpha, gamma, seed)
-        self._prev: Optional[Tuple[tuple, str]] = None
+        # Previous state, action, and reward for the SARSA update
+        self._s_prev: Optional[tuple] = None
+        self._a_prev: Optional[str] = None
+        self._r_prev: Optional[float] = None
         self.policy_name = policy_name  # on-policy selection
 
     def step(self, env, policy_name: Optional[str] = None):
         """On-policy SARSA update using current policy for a' selection.
-        If this is the first call (no previous action), it behaves like action selection only and defers update to next call.
-        Returns: (reward, info, transition) where transition=(s_prev,a_prev,s_curr,a_curr)
+        The update for (s,a) happens on the next call to step(), after r' is observed.
+        Returns: (reward, info, transition) where transition=(s_curr, a_curr, s_next, None)
         """
         polname = policy_name or self.policy_name
-        s_t = st.build_state_from_env(env, self.agent_id)
-        applicable_t = env.applicable_actions(self.agent_id)
-        a_t = pol.choose_action(polname, s_t, applicable_t, self.Q, self.rng)
-        _sp, r_t, info = env.step(self.agent_id, a_t)
-        s_tp1 = st.build_state_from_env(env, self.agent_id)
-        applicable_tp1 = env.applicable_actions(self.agent_id)
-        if self._prev is not None:
-            (s_prev, a_prev) = self._prev
-            q_prev = self.Q[(s_prev, a_prev)]
-            q_next = self.Q[(s_t, a_t)] if applicable_t else 0.0
-            td_target = r_t + self.gamma * q_next
-            td = td_target - q_prev
-            self.Q[(s_prev, a_prev)] = q_prev + self.alpha * td
-        self._prev = (s_t, a_t)
-        return r_t, info, (self._prev[0], self._prev[1], s_tp1, None)
+        s_curr = st.build_state_from_env(env, self.agent_id)
+        applicable_curr = env.applicable_actions(self.agent_id)
+        a_curr = pol.choose_action(polname, s_curr, applicable_curr, self.Q, self.rng)
+
+        # Perform SARSA update for the *previous* step (s_prev, a_prev)
+        # We now have (s, a, r, s', a') where s=s_prev, a=a_prev, r=r_prev, s'=s_curr, a'=a_curr
+        if self._s_prev is not None and self._a_prev is not None and self._r_prev is not None:
+            q_prev = self.Q[(self._s_prev, self._a_prev)]
+            q_curr = self.Q[(s_curr, a_curr)]  # Q(s', a')
+            
+            td_target = self._r_prev + self.gamma * q_curr
+            td_error = td_target - q_prev
+            self.Q[(self._s_prev, self._a_prev)] += self.alpha * td_error
+
+        # Act in the environment and store results for the *next* update
+        _s_next, r_curr, info = env.step(self.agent_id, a_curr)
+        self._s_prev = s_curr
+        self._a_prev = a_curr
+        self._r_prev = r_curr
+
+        s_next = st.build_state_from_env(env, self.agent_id)
+        return r_curr, info, (s_curr, a_curr, s_next, None)
