@@ -1,0 +1,61 @@
+{
+  "experiment": "4",
+  "algo": "QLEARNING",
+  "alpha": 0.3,
+  "gamma": 0.5,
+  "warmup_steps": 500,
+  "policy_warmup": "PRANDOM",
+  "policy_after": "PEXPLOIT",
+  "seeds": {
+    "F": 111,
+    "M": 333
+  },
+  "world": {
+    "H": 6,
+    "W": 8,
+    "obstacles": [
+      [
+        2,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        3,
+        4
+      ]
+    ],
+    "pickups": {
+      "(0, 0)": 2,
+      "(5, 0)": 1
+    },
+    "drops": [
+      [
+        5,
+        7
+      ]
+    ],
+    "start_F": [
+      0,
+      1
+    ],
+    "start_M": [
+      5,
+      1
+    ]
+  },
+  "pickup_change_at_episode": 3,
+  "pickup_change_to": [
+    [
+      1,
+      2
+    ],
+    [
+      4,
+      5
+    ]
+  ],
+  "timestamp": "2025-10-31T16:05:49"
+}
