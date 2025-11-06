@@ -1,5 +1,0 @@
-folder,algo,alpha,run,nzF,nzM,maxF,maxM,episodes,mean_return,best_return,mean_steps,avg_manhattan
-artifacts/exp3-20251031-152518/qlearning_a015_run1,qlearning,0.15,1,3593,3599,1.8907875,2.74725,16,-28.75,-15.0,500.0,4.591625
-artifacts/exp3-20251031-152518/qlearning_a015_run2,qlearning,0.15,2,3602,3599,1.8907875,3.8201625000000003,16,-24.6875,-15.0,500.0,4.598
-artifacts/exp3-20251031-152518/qlearning_a045_run1,qlearning,0.45,1,3593,3599,4.455,6.9052500000000006,16,-28.75,-15.0,500.0,4.591625
-artifacts/exp3-20251031-152518/qlearning_a045_run2,qlearning,0.45,2,3602,3599,4.455,8.2528875,16,-24.6875,-15.0,500.0,4.598
