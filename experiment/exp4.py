@@ -13,8 +13,8 @@ Spec:
 - Log steps/episodes; aggregate & plot; save final Q-tables; optional visuals
 
 Usage:
-  python experiments/exp4.py
-  python experiments/exp4.py --algo sarsa --runs 2 --steps_cap 40000
+  python experiment/exp4.py
+  python experiment/exp4.py --algo sarsa --runs 2 --steps_cap 40000
 """
 
 import os, sys, json, argparse
@@ -65,13 +65,11 @@ def _apply_pickup_change(env: PDWorld, new_pickups: dict):
     Prefer a dedicated method if your PDWorld exposes one; otherwise set attribute and
     refresh any cached masks if available.
     """
-    # If your env has a setter, use it:
-    if hasattr(env, "set_pickups") and callable(getattr(env, "set_pickups")):
-        env.set_pickups(new_pickups)
-        return
+    if hasattr(env, "set_pickups") and callable(env.set_pickups):
+        env.set_pickups(new_pickups, reset_blocks=True)
+    else:
+        env.pickups = dict(new_pickups)
 
-    # Fallback: assign and refresh any cached structures if present.
-    env.pickups = dict(new_pickups)
     for fn in ("rebuild_task_mask", "refresh_pickup_cache", "recompute_masks"):
         if hasattr(env, fn) and callable(getattr(env, fn)):
             try:
@@ -93,7 +91,7 @@ def run_single(
     warmup: int = 500,
     seedF: int = 111,
     seedM: int = 333,
-    steps_cap: int = 30000,      # safety cap so we don't loop forever
+    steps_cap: int = 80000,    
     world_kwargs: dict | None = None,
 ):
     """
@@ -141,19 +139,6 @@ def run_single(
 
     t = 0
     while terminals_reached < 6 and t < steps_cap:
-        if env.is_terminal():
-            # terminal: reset to initial world state (positions, counters)
-            env.reset()
-            episode_idx += 1
-            terminals_reached += 1
-
-            # Do the pickup switch immediately after we *reach* the 3rd terminal
-            if (terminals_reached == 3) and (not pickups_changed):
-                _apply_pickup_change(env, PICKUPS_AFTER_CHANGE)
-                pickups_changed = True
-                # Also update meta snapshot of world so visuals know new pickups
-                meta["world"]["pickups"] = {str(k): v for k, v in env.pickups.items()}
-
         agent_id = "F" if (t % 2 == 0) else "M"
         policy = "PRANDOM" if t < warmup else "PEXPLOIT"
 
@@ -173,12 +158,41 @@ def run_single(
             carry_F=int(info["carry_F"]), carry_M=int(info["carry_M"]),
             terminal=int(info["terminal"]),
         )
+        t += 1
 
-        # End-of-episode write
         if info["terminal"]:
+            terminals_reached += 1
             log.end_episode(episode=episode_idx)
 
-        t += 1
+            if (terminals_reached == 3) and (not pickups_changed):
+                _apply_pickup_change(env, PICKUPS_AFTER_CHANGE)
+                env.reset()
+                pickups_changed = True
+
+                # keep both representations, so any visualizer can read one
+                #meta["world"]["pickups"] = {str(k): v for k, v in env.pickups.items()}        # dict with string keys
+                meta["world"]["pickups_changed_at_episode"] = 3
+                meta["world"]["pickups_list"] = [[r, c, n] for (r, c), n in env.pickups.items()]     
+
+                # persist the new meta so MAKE_VIS (or any post tool) sees the update
+                log.update_meta(meta)
+
+                # optional, but nice: event row with the fresh state
+                log.log_event(
+                    step=t,
+                    episode=episode_idx + 1,
+                    tag="PICKUPS_CHANGED",
+                    payload={"to": meta["world"]["pickups_list"]},
+                    pos_F=env.pos_F, pos_M=env.pos_M,
+                    carry_F=int(env.carry_F), carry_M=int(env.carry_M),
+                )
+
+                #meta["world"]["pickups_list"] = [[r, c, n] for (r, c), n in env.pickups.items()]
+
+            else:
+                env.reset()
+
+            episode_idx += 1
 
     log.close()
 

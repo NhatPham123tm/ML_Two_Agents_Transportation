@@ -385,6 +385,13 @@ def _safe_pickups_dict(d: dict) -> Dict[Tuple[int, int], int]:
         out[(int(rc[0]), int(rc[1]))] = int(v)
     return out
 
+def _pickups_from_world(world: dict) -> Dict[Tuple[int,int], int]:
+    # Prefer list form ONLY if this run recorded a mid-run change
+    if world.get("pickups_changed_at_episode") is not None and world.get("pickups_list"):
+        return {(int(r), int(c)): int(n) for r, c, n in world["pickups_list"]}
+    # Fallback (default for other experiments): use 'pickups'
+    return _safe_pickups_dict(world["pickups"])
+
 # ======================================================================
 # Orchestrator
 # ======================================================================
@@ -405,7 +412,7 @@ def make_visuals(outdir: str, env_spec: dict, QF: dict, QM: dict) -> None:
     env = PDWorld(
         H=env_spec["H"], W=env_spec["W"],
         obstacles=set(map(tuple, env_spec["obstacles"])),
-        pickups=_safe_pickups_dict(env_spec["pickups"]),
+        pickups=_pickups_from_world(env_spec),   # <-- changed
         drops=[tuple(d) for d in env_spec["drops"]],
         start_F=tuple(env_spec["start_F"]),
         start_M=tuple(env_spec["start_M"]),
@@ -470,21 +477,79 @@ def make_visuals(outdir: str, env_spec: dict, QF: dict, QM: dict) -> None:
     # --- 3) Animation from steps.csv (with pickups/drops for cues) ---
     steps_csv = Path(outdir) / "steps.csv"
     if steps_csv.exists():
-        df = None
         try:
-            import pandas as pd
+            import pandas as pd, json
             df = pd.read_csv(steps_csv)
         except Exception:
             df = None
+
         if df is not None:
-            animate_grid(
-                df,
-                (env.H, env.W),
-                list(env.obstacles),
-                str(vizdir / "trajectory.mp4"),
-                pickups=env.pickups,
-                drops=env.drops,
-                fps=10,
-                show_rewards=True,
-                trail_len=30,
-            )
+            # Detect mid-run pickup change (from our log_event)
+            change_rows = df[df["agent"] == "PICKUPS_CHANGED"]
+            if not change_rows.empty:
+                change_step = int(change_rows.iloc[0]["global_step"])
+                # Parse target pickups from 'action' JSON payload if present
+                new_pk = None
+                try:
+                    payload = change_rows.iloc[0]["action"]
+                    if isinstance(payload, str) and payload.strip():
+                        obj = json.loads(payload)
+                        if "to" in obj:
+                            # 'to' may be [[r,c],[r,c]] or [[r,c,n],...]
+                            arr = obj["to"]
+                            new_pk = {}
+                            for item in arr:
+                                r, c = int(item[0]), int(item[1])
+                                n = int(item[2]) if len(item) >= 3 else 1
+                                new_pk[(r, c)] = n
+                except Exception:
+                    pass
+
+                # Old pickups come from env_spec["pickups"] (original)
+                old_pk = _safe_pickups_dict(env_spec["pickups"])
+                # If meta had pickups_list updated, prefer that as the "after" if payload missing
+                if new_pk is None and "pickups_list" in env_spec:
+                    new_pk = {(int(r), int(c)): int(n) for r, c, n in env_spec["pickups_list"]}
+
+                # Split dataframe
+                df_before = df[df["global_step"] <= change_step].copy()
+                df_after  = df[df["global_step"] >= change_step].copy()
+
+                # Render two clips
+                if not df_before.empty:
+                    animate_grid(
+                        df_before,
+                        (env.H, env.W),
+                        list(env.obstacles),
+                        str(vizdir / "trajectory_before.mp4"),
+                        pickups=old_pk,
+                        drops=env.drops,
+                        fps=10,
+                        show_rewards=True,
+                        trail_len=30,
+                    )
+                if not df_after.empty and new_pk:
+                    animate_grid(
+                        df_after,
+                        (env.H, env.W),
+                        list(env.obstacles),
+                        str(vizdir / "trajectory_after.mp4"),
+                        pickups=new_pk,
+                        drops=env.drops,
+                        fps=10,
+                        show_rewards=True,
+                        trail_len=30,
+                    )
+            else:
+                # No change event – single clip with (possibly updated) pickups
+                animate_grid(
+                    df,
+                    (env.H, env.W),
+                    list(env.obstacles),
+                    str(vizdir / "trajectory.mp4"),
+                    pickups=env.pickups,
+                    drops=env.drops,
+                    fps=10,
+                    show_rewards=True,
+                    trail_len=30,
+                )

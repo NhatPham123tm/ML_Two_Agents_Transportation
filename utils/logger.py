@@ -74,6 +74,10 @@ class ExperimentLogger:
         # state
         self._ep_stats: Dict[int, EpisodeStats] = {}
         self._run_started = False
+        self._last_pos_F = None
+        self._last_pos_M = None
+        self._last_carry_F = 0
+        self._last_carry_M = 0
 
     def start_run(self) -> None:
         if self._run_started: 
@@ -97,6 +101,11 @@ class ExperimentLogger:
             "carry_M": int(carry_M),
             "terminal": int(terminal),
         })
+        self._last_pos_F = str(tuple(pos_F))
+        self._last_pos_M = str(tuple(pos_M))
+        self._last_carry_F = int(carry_F)
+        self._last_carry_M = int(carry_M)
+
         # accumulate episode stats
         stats = self._ep_stats.get(episode)
         if stats is None:
@@ -109,6 +118,33 @@ class ExperimentLogger:
             return
         self.eps_writer.writerow(stats.to_row())
         # keep stats but do not reset; episodes are unique keys
+
+    def log_event(self, *, step: int, episode: int, tag: str,
+             payload: Optional[dict] = None,
+             pos_F: Optional[tuple] = None, pos_M: Optional[tuple] = None,
+             carry_F: Optional[int] = None, carry_M: Optional[int] = None) -> None:
+        """
+        Write a marker row into steps.csv that still satisfies downstream parsers.
+        """
+        row = {
+            "global_step": step,
+            "episode_idx": episode,
+            "agent": tag,   # visible in spreadsheets
+            "action": json.dumps(payload or {}, ensure_ascii=False),
+            # Use provided values, otherwise fall back to last known
+            "pos_F": str(tuple(pos_F)) if pos_F is not None else (self._last_pos_F or "(0,0)"),
+            "pos_M": str(tuple(pos_M)) if pos_M is not None else (self._last_pos_M or "(0,0)"),
+            "carry_F": int(carry_F if carry_F is not None else self._last_carry_F or 0),
+            "carry_M": int(carry_M if carry_M is not None else self._last_carry_M or 0),
+            "reward": "",   # keep blank; aggregators don’t use it
+            "terminal": "", # keep blank; it’s a marker
+        }
+        self.steps_writer.writerow(row)
+
+    def update_meta(self, new_meta: dict) -> None:
+        self.meta = new_meta
+        with open(self.f_meta, "w", encoding="utf-8") as f:
+            json.dump(self.meta, f, indent=2)
 
     def close(self) -> None:
         try:
