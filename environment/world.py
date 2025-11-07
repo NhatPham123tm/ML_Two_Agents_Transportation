@@ -51,8 +51,18 @@ class PDWorld:
     steps_in_episode: int = field(init=False, default=0)
     _viz_goal: Optional[Coord] = field(init=False, default=None)
 
+    _pickup_order: Tuple[Coord, ...] = field(init=False)
+
     def __post_init__(self):
+        self._pickup_order = tuple(sorted(self.pickups.keys()))
         self.reset()
+
+    def set_pickups(self, new_pickups: Dict[Coord, int], *, reset_blocks=True):
+        self.pickups = dict(new_pickups)
+        self._pickup_order = tuple(sorted(self.pickups.keys()))
+        if reset_blocks:
+            self._blocks = dict(self.pickups)
+        self._viz_goal = None
 
     # ---- Episode control ----
     def reset(self) -> None:
@@ -75,7 +85,8 @@ class PDWorld:
     # ---- State encoding for independent learners ----
     def encode_state(self, agent_id: str) -> tuple:
         mask = 0
-        for i,cell in enumerate(sorted(self.pickups.keys())):
+        # Use the cached order to avoid nondeterministic bit flips
+        for i, cell in enumerate(self._pickup_order):
             if self._blocks.get(cell, 0) > 0:
                 mask |= (1 << i)
         def idx(rc: Coord) -> int:

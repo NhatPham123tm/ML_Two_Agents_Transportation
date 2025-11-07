@@ -11,13 +11,13 @@ Spec from assignment:
 
 Usage:
   # Q-learning (default), 8000 steps, α in {0.15, 0.45}, two runs each
-  python experiments/exp3.py
+  python experiment/exp3.py
 
   # SARSA instead
-  python experiments/exp3.py --algo sarsa
+  python experiment/exp3.py --algo sarsa
 
   # Customize steps/warmup/seeds and tag
-  python experiments/exp3.py --steps 12000 --warmup 1000 --gamma 0.5 --runs 2 --tag exp3_demo
+  python experiment/exp3.py --steps 12000 --warmup 1000 --gamma 0.5 --runs 2 --tag exp3_demo
 """
 
 import os, sys, json, argparse

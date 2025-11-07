@@ -1,0 +1,8 @@
+default is qlearning
+python experiment/exp3.py --algo qlearning
+
+change to sarsa
+python experiment/exp3.py --algo sarsa
+
+more flag flags 
+python experiments/exp3.py --algo qlearning --steps 8000 --warmup 500
