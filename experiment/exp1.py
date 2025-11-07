@@ -53,6 +53,8 @@ def run_single(
     seedF: int = 123,
     seedM: int = 321,
     world_kwargs: dict | None = None,
+    print_every: int = 500,
+    verbose: bool = True,
 ):
     os.makedirs(outdir, exist_ok=True)
 
@@ -96,13 +98,19 @@ def run_single(
 
     episode_idx = 0
     for t in range(steps):
+
+        # Mark end of warmup right when we cross it
+        if verbose and t == warmup:
+            print(f"[INFO] Warmup finished at step {t}. Switching to {policy_after_warmup(variant)}.", flush=True)
+
         if env.is_terminal():
-            # terminal: reset world, keep Q-tables
             env.reset()
             episode_idx += 1
+            if verbose:
+                print(f"[EP] Ended episode {episode_idx-1}; reset -> episode {episode_idx}", flush=True)
 
         agent_id = "F" if (t % 2 == 0) else "M"
-        policy = "PRANDOM" if t < warmup else after
+        policy = "PRANDOM" if t < warmup else policy_after_warmup(variant)
 
         if agent_id == "F":
             r, info, tr = aF.step(env, policy); action_taken = tr[1]
@@ -119,6 +127,17 @@ def run_single(
             carry_F=int(info["carry_F"]), carry_M=int(info["carry_M"]),
             terminal=int(info["terminal"]),
         )
+
+        # Heartbeat print
+        if verbose and (t % print_every == 0 or t == steps - 1):
+            # 1-based step for display
+            disp = t + 1
+            print(
+                f"STEP {disp}/{steps} | ep={episode_idx} | agent={agent_id} | pol={policy} "
+                f"| act={action_taken} | r={r:.3f} | F{info['pos_F']} M{info['pos_M']} "
+                f"| term={int(info['terminal'])}",
+                flush=True
+            )
 
         if info["terminal"]:
             log.end_episode(episode=episode_idx)
@@ -151,7 +170,7 @@ def run_single(
 
     # Make visuals (if viz modules available)
     if VIZ_OK:
-        print("Generating visual output ...")
+        print("Generating visual output (May take a while) ...", flush=True)
         make_visuals(
             outdir=outdir,
             env_spec=meta["world"],   # we already built this dict above
@@ -184,6 +203,8 @@ def main():
                         help="Seeds for agent M (provide >= runs)")
     parser.add_argument("--outroot", type=str, default="artifacts",
                         help="Where to write run folders (default artifacts)")
+    parser.add_argument("--print-every", type=int, default=500, help="print a heartbeat every N steps")
+    parser.add_argument("--verbose", action="store_true", help="enable console progress prints")
     args = parser.parse_args()
     
     if len(args.seedF) < args.runs or len(args.seedM) < args.runs:
@@ -191,6 +212,7 @@ def main():
     
     os.makedirs(args.outroot, exist_ok=True)
     print("Running Agents ...")
+    
     for i in range(args.runs):
         outdir = os.path.join(args.outroot, f"exp1{args.variant}_run{i+1}")
         res = run_single(
@@ -202,6 +224,8 @@ def main():
             gamma=args.gamma,
             seedF=args.seedF[i],
             seedM=args.seedM[i],
+            print_every=args.print_every,
+            verbose=args.verbose,
         )
         print(f"[OK] Wrote: {res['outdir']}")
 

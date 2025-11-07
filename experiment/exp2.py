@@ -47,6 +47,8 @@ def run_single(
     seedF: int = 111,
     seedM: int = 333,
     world_kwargs: dict | None = None,
+    print_every: int = 500,
+    verbose: bool = True,
 ):
     os.makedirs(outdir, exist_ok=True)
 
@@ -91,20 +93,26 @@ def run_single(
 
     episode_idx = 0
     for t in range(steps):
+
+        # announce warmup end exactly when it switches
+        if verbose and t == warmup:
+            print("[INFO] Warmup finished at step "
+                  f"{t}. Switching to PEXPLOIT.", flush=True)
+
         if env.is_terminal():
             env.reset()
             episode_idx += 1
-            # Agents keep their Q and SARSA memory (_prev) continues naturally with next selection
+            if verbose:
+                print(f"[EP] Ended episode {episode_idx-1}; "
+                      f"reset -> episode {episode_idx}", flush=True)
 
         agent_id = "F" if (t % 2 == 0) else "M"
         policy = "PRANDOM" if t < warmup else "PEXPLOIT"
 
         if agent_id == "F":
-            r, info, tr = aF.step(env, policy)  # on-policy: uses 'policy' for a_t selection
-            action_taken = tr[1]
+            r, info, tr = aF.step(env, policy); action_taken = tr[1]
         else:
-            r, info, tr = aM.step(env, policy)
-            action_taken = tr[1]
+            r, info, tr = aM.step(env, policy); action_taken = tr[1]
 
         log.log_step(
             step=t,
@@ -116,6 +124,16 @@ def run_single(
             carry_F=int(info["carry_F"]), carry_M=int(info["carry_M"]),
             terminal=int(info["terminal"]),
         )
+
+        # heartbeat: print every N steps and on last step
+        if verbose and (t % print_every == 0 or t == steps - 1):
+            disp = t + 1  # 1-based for display
+            print(
+                f"STEP {disp}/{steps} | ep={episode_idx} | agent={agent_id} "
+                f"| pol={policy} | act={action_taken} | r={r:.3f} "
+                f"| F{info['pos_F']} M{info['pos_M']} | term={int(info['terminal'])}",
+                flush=True
+            )
 
         if info["terminal"]:
             log.end_episode(episode=episode_idx)
@@ -137,9 +155,9 @@ def run_single(
     with open(os.path.join(outdir, "qtable_M.json"), "w", encoding="utf-8") as f:
         json.dump(q_to_json(aM.Q), f, indent=2)
     
-    # Optional visuals (heatmaps, quiver, overlays, animation) if your helper is present
+    # Optional visuals (heatmaps, quiver, overlays, animation)
     if VIZ_OK:
-        print("Generating visual output ...")
+        print("Generating visual output (May take a while) ...", flush=True)
         make_visuals(outdir, meta_world, aF.Q, aM.Q)
 
     return {
@@ -165,6 +183,10 @@ def main():
                     help="Seeds for agent M (≥ runs)")
     ap.add_argument("--outroot", type=str, default="artifacts",
                     help="Output root folder")
+    ap.add_argument("--print-every", type=int, default=500,
+                    help="print progress every N steps")
+    ap.add_argument("--verbose", action="store_true",
+                    help="enable console progress prints")
     args = ap.parse_args()
 
     os.makedirs(args.outroot, exist_ok=True)
@@ -179,6 +201,8 @@ def main():
             gamma=args.gamma,
             seedF=args.seedF[i],
             seedM=args.seedM[i],
+            print_every=args.print_every,
+            verbose=args.verbose,
         )
         print(f"[OK] Wrote: {res['outdir']}")
 

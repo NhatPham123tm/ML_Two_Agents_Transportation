@@ -62,7 +62,9 @@ def _mk_env(world_kwargs=None):
 def _q_to_json(qdict):
     return {f"{list(k[0])}|{k[1]}": float(v) for k, v in qdict.items()}
 
-def _run_single_alpha(outdir, algo, alpha, gamma, steps, warmup, seedF, seedM, world_kwargs=None):
+def _run_single_alpha(outdir, algo, alpha, gamma, steps, warmup, seedF, seedM, world_kwargs=None, 
+                      print_every: int = 500,
+                      verbose: bool = True,):
     os.makedirs(outdir, exist_ok=True)
     env = _mk_env(world_kwargs)
 
@@ -99,9 +101,15 @@ def _run_single_alpha(outdir, algo, alpha, gamma, steps, warmup, seedF, seedM, w
 
     episode_idx = 0
     for t in range(steps):
+        # Announce when warmup ends
+        if verbose and t == warmup:
+            print(f"[INFO] α={alpha} warmup finished at step {t}. Switching to PEXPLOIT.", flush=True)
+
         if env.is_terminal():
             env.reset()
             episode_idx += 1
+            if verbose:
+                print(f"[EP] α={alpha} ended episode {episode_idx-1}; reset -> ep {episode_idx}", flush=True)
 
         agent_id = "F" if (t % 2 == 0) else "M"
         policy = "PRANDOM" if t < warmup else "PEXPLOIT"
@@ -117,6 +125,16 @@ def _run_single_alpha(outdir, algo, alpha, gamma, steps, warmup, seedF, seedM, w
             carry_F=int(info["carry_F"]), carry_M=int(info["carry_M"]),
             terminal=int(info["terminal"]),
         )
+
+        # Heartbeat every N steps (and final)
+        if verbose and (t % print_every == 0 or t == steps - 1):
+            disp = t + 1
+            print(
+                f"STEP {disp}/{steps} | α={alpha} | ep={episode_idx} | agent={agent_id} "
+                f"| pol={policy} | act={action_taken} | r={r:.3f} "
+                f"| F{info['pos_F']} M{info['pos_M']} | term={int(info['terminal'])}",
+                flush=True
+            )
 
         if info["terminal"]:
             log.end_episode(episode=episode_idx)
@@ -139,7 +157,7 @@ def _run_single_alpha(outdir, algo, alpha, gamma, steps, warmup, seedF, seedM, w
     # Optional visuals
     if MAKE_VIS:
         try:
-            print("Generating visual output ...")
+            print("Generating visual output (May take a while) ...")
             MAKE_VIS(outdir, meta_world, aF.Q, aM.Q)
         except Exception as e:
             with open(os.path.join(outdir, "viz", "_viz_error.txt"), "w", encoding="utf-8") as f:
@@ -153,7 +171,7 @@ def _run_single_alpha(outdir, algo, alpha, gamma, steps, warmup, seedF, seedM, w
     return {"outdir": outdir, "nzF": nonzeroF, "nzM": nonzeroM, "maxF": maxF, "maxM": maxM}
 
 def main():
-    print("Bulding PDWorld ...")
+    print("Bulding PDWorld ...", flush=True)
     ap = argparse.ArgumentParser(description="Experiment 3: compare α=0.15 vs α=0.45 for Q-learning or SARSA")
     ap.add_argument("--algo", choices=["qlearning","sarsa"], default="qlearning",
                     help="Base algorithm to replicate (default: qlearning like Exp 1.c)")
@@ -171,6 +189,8 @@ def main():
                     help="Output root directory (default: artifacts)")
     ap.add_argument("--tag", type=str, default=None,
                     help="Subfolder name under outroot (default: exp3-<timestamp>)")
+    ap.add_argument("--print-every", type=int, default=500, help="print progress every N steps")
+    ap.add_argument("--verbose", action="store_true", help="enable console progress prints")
     args = ap.parse_args()
 
     if len(args.seedF) < args.runs or len(args.seedM) < args.runs:
@@ -181,7 +201,7 @@ def main():
     os.makedirs(batch_root, exist_ok=True)
 
     summary_rows = []
-    print("Running Agents ...")
+    print("Running Agents ...", flush=True)
     for alpha in args.alphas:
         for i in range(args.runs):
             folder = os.path.join(batch_root, f"{args.algo}_a{str(alpha).replace('.','')}_run{i+1}")
@@ -195,6 +215,8 @@ def main():
                 warmup=args.warmup,
                 seedF=args.seedF[i],
                 seedM=args.seedM[i],
+                print_every=args.print_every,
+                verbose=True,
             )
             # Per-run episode metrics
             ep = os.path.join(folder, "episodes.csv")

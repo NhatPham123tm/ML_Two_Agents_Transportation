@@ -28,7 +28,10 @@ from environment.world import PDWorld
 from utils.logger import ExperimentLogger
 from utils.plot import aggregate_episodes, plot_learning_curves, plot_coordination
 from agents.learner import QLearningAgent, SarsaAgent
-
+try:
+    sys.stdout.reconfigure(line_buffering=True)
+except Exception:
+    pass
 # Optional visuals
 MAKE_VIS = None
 try:
@@ -93,6 +96,8 @@ def run_single(
     seedM: int = 333,
     steps_cap: int = 80000,    
     world_kwargs: dict | None = None,
+    print_every: int = 500,
+    verbose: bool = True,   
 ):
     """
     Run until 6 terminal episodes; switch pickups right after the 3rd terminal.
@@ -139,6 +144,10 @@ def run_single(
 
     t = 0
     while terminals_reached < 6 and t < steps_cap:
+        # announce warmup end once
+        if verbose and t == warmup:
+            print(f"[INFO] Warmup finished at step {t}. Switching to PEXPLOIT.", flush=True)
+
         agent_id = "F" if (t % 2 == 0) else "M"
         policy = "PRANDOM" if t < warmup else "PEXPLOIT"
 
@@ -147,7 +156,6 @@ def run_single(
         else:
             r, info, tr = aM.step(env, policy); action_taken = tr[1]
 
-        # Log each step
         log.log_step(
             step=t,
             episode=episode_idx,
@@ -158,26 +166,34 @@ def run_single(
             carry_F=int(info["carry_F"]), carry_M=int(info["carry_M"]),
             terminal=int(info["terminal"]),
         )
+
+        # heartbeat: print at step 0, every N steps, and you can also add "or t == steps_cap-1"
+        if verbose and (t % print_every == 0):
+            print(
+                f"STEP {t}/{steps_cap} | ep={episode_idx} | agent={agent_id} "
+                f"| pol={policy} | act={action_taken} | r={r:.3f} "
+                f"| F{info['pos_F']} M{info['pos_M']} | term={int(info['terminal'])}",
+                flush=True
+            )
+
         t += 1
 
         if info["terminal"]:
             terminals_reached += 1
             log.end_episode(episode=episode_idx)
+            if verbose:
+                print(f"[TERM] episode {episode_idx} ended "
+                      f"(terminals={terminals_reached}/6, steps={t})", flush=True)
 
             if (terminals_reached == 3) and (not pickups_changed):
                 _apply_pickup_change(env, PICKUPS_AFTER_CHANGE)
                 env.reset()
                 pickups_changed = True
 
-                # keep both representations, so any visualizer can read one
-                #meta["world"]["pickups"] = {str(k): v for k, v in env.pickups.items()}        # dict with string keys
                 meta["world"]["pickups_changed_at_episode"] = 3
-                meta["world"]["pickups_list"] = [[r, c, n] for (r, c), n in env.pickups.items()]     
-
-                # persist the new meta so MAKE_VIS (or any post tool) sees the update
+                meta["world"]["pickups_list"] = [[r0, c0, n0] for (r0, c0), n0 in env.pickups.items()]
                 log.update_meta(meta)
 
-                # optional, but nice: event row with the fresh state
                 log.log_event(
                     step=t,
                     episode=episode_idx + 1,
@@ -187,8 +203,8 @@ def run_single(
                     carry_F=int(env.carry_F), carry_M=int(env.carry_M),
                 )
 
-                #meta["world"]["pickups_list"] = [[r, c, n] for (r, c), n in env.pickups.items()]
-
+                if verbose:
+                    print(f"[EVENT] PICKUPS_CHANGED at ep=3 → {meta['world']['pickups_list']}", flush=True)
             else:
                 env.reset()
 
@@ -212,7 +228,7 @@ def run_single(
     # Optional visuals (heatmaps, quiver, overlays, animation)
     if MAKE_VIS:
         try:
-            print("Generating visual output ...")
+            print("Generating visual output ...", flush=True)
             MAKE_VIS(outdir, meta["world"], aF.Q, aM.Q)
         except Exception as e:
             viz_dir = os.path.join(outdir, "viz"); os.makedirs(viz_dir, exist_ok=True)
@@ -223,6 +239,9 @@ def run_single(
     # simple stats back
     nonzeroF = sum(1 for v in aF.Q.values() if abs(v) > 1e-9)
     nonzeroM = sum(1 for v in aM.Q.values() if abs(v) > 1e-9)
+
+    if verbose:
+        print(f"[DONE] steps={t} | terminals={terminals_reached} | pickups_changed={pickups_changed}", flush=True)
     return {
         "outdir": outdir,
         "episodes_written": len(ep_df) if isinstance(ep_df, pd.DataFrame) else 0,
@@ -233,7 +252,7 @@ def run_single(
 
 
 def main():
-    print("Bulding PDWorld ...")
+    print("Bulding PDWorld ...", flush=True)
     ap = argparse.ArgumentParser(description="Experiment 4: adapt to changed pickup locations after 3 terminals")
     ap.add_argument("--algo", choices=["qlearning","sarsa"], default="qlearning",
                     help="Base algorithm")
@@ -249,6 +268,8 @@ def main():
                     help="Global step safety cap (stop even if 6 terminals not reached)")
     ap.add_argument("--outroot", type=str, default="artifacts")
     ap.add_argument("--tag", type=str, default=None, help="Batch subfolder name")
+    ap.add_argument("--print-every", type=int, default=500,help="print progress every N steps")
+    ap.add_argument("--verbose", action="store_true",help="enable console progress prints")
     args = ap.parse_args()
 
     if len(args.seedF) < args.runs or len(args.seedM) < args.runs:
@@ -259,10 +280,13 @@ def main():
     os.makedirs(batch_root, exist_ok=True)
 
     rows = []
-    print("Running Agents ...")
+    total_runs = args.runs
+    print("Running Agents ...", flush=True)
     for i in range(args.runs):
+        k = i + 1
         outdir = os.path.join(batch_root, f"{args.algo}_run{i+1}")
-        print(f"[exp4] {args.algo} run{i+1} → {outdir}")
+        print(f"[exp4] ({k}/{total_runs}) {args.algo} run{k} → {outdir}", flush=True)
+        print(f"PROGRESS RUN {k}/{total_runs}", flush=True)
         res = run_single(
             outdir=outdir,
             algo=args.algo,
@@ -272,6 +296,8 @@ def main():
             seedF=args.seedF[i],
             seedM=args.seedM[i],
             steps_cap=args.steps_cap,
+            print_every=args.print_every,
+            verbose=True,
         )
         rows.append(res)
 
