@@ -71,9 +71,9 @@ def main():
                         help="Algorithm to use for Exp 3 and 4 (default: qlearning)")
     parser.add_argument("--outroot", type=str, default="artifacts", help="Root directory for output artifacts")
     parser.add_argument("--tag", type=str, default=None, help="Optional custom subfolder name for the run batch")
-    parser.add_argument("--seedF", type=int, nargs="*", default=[123],
+    parser.add_argument("--seedF", type=int, nargs="*", default=[123, 223],
                     help="Seed(s) for agent F (default: predefined list)")
-    parser.add_argument("--seedM", type=int, nargs="*", default=[321],
+    parser.add_argument("--seedM", type=int, nargs="*", default=[321, 421],
                     help="Seed(s) for agent M (default: predefined list)")
     args = parser.parse_args()
 

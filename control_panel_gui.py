@@ -86,10 +86,10 @@ class ControlPanel(tk.Tk):
 
         # --- Seed Entry ---
         seedF_label = ttk.Label(self.config_frame, text="Seed (F):")
-        self.seedF_entry = ttk.Entry(self.config_frame, textvariable=self.seedF_var, width=8)
-
+        self.seedF_entry = ttk.Entry(self.config_frame, textvariable=self.seedF_var, width=20)
         seedM_label = ttk.Label(self.config_frame, text="Seed (M):")
-        self.seedM_entry = ttk.Entry(self.config_frame, textvariable=self.seedM_var, width=8)
+        self.seedM_entry = ttk.Entry(self.config_frame, textvariable=self.seedM_var, width=20)
+
         # --- Output Display ---
         self.output_text = scrolledtext.ScrolledText(self.output_frame, wrap=tk.WORD, state=tk.DISABLED)
         
@@ -168,21 +168,26 @@ class ControlPanel(tk.Tk):
         
         # Determine correct python executable based on OS for cross-platform compatibility
         python_executable = "python" if sys.platform == "win32" else "python3"
-        seedF = self.seedF_var.get()
-        seedM = self.seedM_var.get()
-        try:
-            int(seedF)
-            int(seedM)
-        except ValueError:
-            messagebox.showerror("Invalid Seed", "Seeds must be integers.")
+
+        def parse_seed_list(s: str) -> list[str]:
+            return [x.strip() for x in s.replace(" ", "").split(",") if x.strip()]
+
+        seedF_list = parse_seed_list(self.seedF_var.get())
+        seedM_list = parse_seed_list(self.seedM_var.get())
+
+        if len(seedF_list) < int(self.runs_var.get()) or len(seedM_list) < int(self.runs_var.get()):
+            tk.messagebox.showerror("Invalid Seeds",
+                f"Each experiment requires at least {self.runs_var.get()} seeds "
+                f"for F and M (comma-separated).")
             return
+        
         # Construct the command
         cmd = [
             python_executable, "-u", "run_experiment.py", self.exp_var.get(),
             "--runs", self.runs_var.get(),
             "--algo", self.algo_var.get(),
-            "--seedF", seedF,
-            "--seedM", seedM,
+            "--seedF", *seedF_list,
+            "--seedM", *seedM_list,
         ]
 
         # Run in a thread to keep the GUI responsive
