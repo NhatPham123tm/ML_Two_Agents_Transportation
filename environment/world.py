@@ -53,8 +53,14 @@ class PDWorld:
 
     _pickup_order: Tuple[Coord, ...] = field(init=False)
 
+    # cumulative drop counts + flag for first drop filled for screen shot requirement
+    drop_counts: Dict[Coord, int] = field(init=False)
+    first_drop_filled_emitted: bool = field(init=False, default=False)
+
     def __post_init__(self):
         self._pickup_order = tuple(sorted(self.pickups.keys()))
+        self.drop_counts = {d: 0 for d in self.drops}
+        self.first_drop_filled_emitted = False
         self.reset()
 
     def set_pickups(self, new_pickups: Dict[Coord, int], *, reset_blocks=True):
@@ -153,6 +159,7 @@ class PDWorld:
         picked = dropped = False
         attempted_conflict = False
         new_pos = agent_pos
+        first_drop_filled_flag = False
 
         if action in rules.MOVE_ACTIONS:
             dr, dc = rules.MOVES[action]
@@ -180,6 +187,22 @@ class PDWorld:
             if carrying and (agent_pos in self.drops):
                 carrying = False
                 dropped = True
+                if not hasattr(self, "drop_counts"):
+                    self.drop_counts = {d: 0 for d in self.drops}
+
+                # increment count for the drop cell
+                self.drop_counts[agent_pos] = self.drop_counts.get(agent_pos, 0) + 1
+
+                # if this is the *first* drop location and it just reached 5 deliveries,
+                # set the flag once
+                if (
+                    not self.first_drop_filled_emitted
+                    and len(self.drops) > 0
+                    and agent_pos == self.drops[0]
+                    and self.drop_counts[agent_pos] >= 5
+                ):
+                    first_drop_filled_flag = True
+                    self.first_drop_filled_emitted = True
             else:
                 valid = False
 
@@ -226,6 +249,8 @@ class PDWorld:
             'phi_before': phi_s,
             'phi_after': phi_sp,
             'shaping': shaping,
+            'first_drop_filled': first_drop_filled_flag,
+            'drop_counts': dict(self.drop_counts),
         }
         return None, reward, info
 

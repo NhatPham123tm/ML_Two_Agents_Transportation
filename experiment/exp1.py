@@ -55,6 +55,7 @@ def run_single(
     world_kwargs: dict | None = None,
     print_every: int = 500,
     verbose: bool = True,
+    animate = True,
 ):
     os.makedirs(outdir, exist_ok=True)
 
@@ -169,7 +170,7 @@ def run_single(
         return nonzero, maxq
 
     # Make visuals (if viz modules available)
-    if VIZ_OK:
+    if VIZ_OK and animate:
         print("Generating visual output (May take a while) ...", flush=True)
         make_visuals(
             outdir=outdir,

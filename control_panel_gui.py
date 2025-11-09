@@ -48,8 +48,9 @@ class ControlPanel(tk.Tk):
         self.exp_var = tk.StringVar(value="1c")
         self.runs_var = tk.StringVar(value="2")
         self.algo_var = tk.StringVar(value="qlearning")
-        self.seedF_var = tk.StringVar(value="123")
-        self.seedM_var = tk.StringVar(value="321")
+        self.seedF_var = tk.StringVar(value="123,223")
+        self.seedM_var = tk.StringVar(value="321,431")
+        self.animate_var = tk.BooleanVar(value=True) 
         # --- Frames ---
         self.config_frame = ttk.LabelFrame(self, text="Configuration")
         self.action_frame = ttk.Frame(self)
@@ -66,6 +67,14 @@ class ControlPanel(tk.Tk):
             )
             self.exp_radios.append(radio)
 
+        # --- Animation ----
+        self.animate_check = ttk.Checkbutton(
+        self.config_frame,
+        text="Generate Animation Output",
+        variable=self.animate_var,
+        onvalue=True,
+        offvalue=False
+)
         # --- Parameters ---
         runs_label = ttk.Label(self.config_frame, text="Number of Runs:")
         self.runs_entry = ttk.Entry(self.config_frame, textvariable=self.runs_var, width=5)
@@ -96,31 +105,49 @@ class ControlPanel(tk.Tk):
 
     def _layout_widgets(self):
         """Place widgets in the grid layout."""
-        self.columnconfigure(0, weight=1) # Make the main column expandable
+        self.columnconfigure(0, weight=1)  # Make the main column expandable
         self.rowconfigure(2, weight=1)
 
         # Configuration Frame
         self.config_frame.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
-        self.config_frame.columnconfigure(1, weight=0)
-        
-        # Experiment Radios
-        ttk.Label(self.config_frame, text="Experiment:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
-        for i, radio in enumerate(self.exp_radios):
-            radio.grid(row=0, column=i + 1, padx=2, sticky="w")
+        # don’t let config_frame stretch weirdly between columns
+        for c in range(5):
+            self.config_frame.columnconfigure(c, weight=0)
 
-        # Parameters
-        ttk.Label(self.config_frame, text="Runs:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
+        # Experiment Radios
+        ttk.Label(self.config_frame, text="Experiment:").grid(
+            row=0, column=0, padx=5, pady=5, sticky="w"
+        )
+        for i, radio in enumerate(self.exp_radios):
+            radio.grid(row=0, column=i + 1, padx=2, pady=5, sticky="w")
+
+        # Runs
+        ttk.Label(self.config_frame, text="Runs:").grid(
+            row=1, column=0, padx=5, pady=5, sticky="w"
+        )
         self.runs_entry.grid(row=1, column=1, padx=5, pady=5, sticky="w")
-        
-        ttk.Label(self.config_frame, text="Algorithm:").grid(row=2, column=0, padx=5, pady=5, sticky="w")
+
+        # Algorithm
+        ttk.Label(self.config_frame, text="Algorithm:").grid(
+            row=2, column=0, padx=5, pady=5, sticky="w"
+        )
         self.q_radio.grid(row=2, column=1, padx=5, pady=5, sticky="w")
         self.sarsa_radio.grid(row=2, column=2, padx=5, pady=5, sticky="w")
 
-        # Seeds
-        ttk.Label(self.config_frame, text="Seeds:").grid(row=3, column=0, padx=5, pady=5, sticky="w")
-        self.seedF_entry.grid(row=3, column=1, padx=5, pady=5, sticky="w")
-        self.seedM_entry.grid(row=3, column=2, padx=5, pady=5, sticky="w")
-        ttk.Label(self.config_frame, text="(F / M)").grid(row=3, column=3, padx=5, pady=5, sticky="w")
+        # Animation toggle on its own row
+        self.animate_check.grid(
+            row=3, column=0, columnspan=4, padx=5, pady=(0, 5), sticky="w"
+        )
+
+        # Seeds on the next row
+        ttk.Label(self.config_frame, text="Seeds:").grid(
+            row=4, column=0, padx=5, pady=5, sticky="w"
+        )
+        self.seedF_entry.grid(row=4, column=1, padx=5, pady=5, sticky="w")
+        self.seedM_entry.grid(row=4, column=2, padx=5, pady=5, sticky="w")
+        ttk.Label(self.config_frame, text="(F / M)").grid(
+            row=4, column=3, padx=5, pady=5, sticky="w"
+        )
 
         # Action Frame
         self.action_frame.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
@@ -181,6 +208,8 @@ class ControlPanel(tk.Tk):
                 f"for F and M (comma-separated).")
             return
         
+        animate_flag = "--animate" if self.animate_var.get() else "--no-animate"
+
         # Construct the command
         cmd = [
             python_executable, "-u", "run_experiment.py", self.exp_var.get(),
@@ -188,6 +217,7 @@ class ControlPanel(tk.Tk):
             "--algo", self.algo_var.get(),
             "--seedF", *seedF_list,
             "--seedM", *seedM_list,
+            animate_flag,
         ]
 
         # Run in a thread to keep the GUI responsive

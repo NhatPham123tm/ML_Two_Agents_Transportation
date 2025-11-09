@@ -64,7 +64,9 @@ def _q_to_json(qdict):
 
 def _run_single_alpha(outdir, algo, alpha, gamma, steps, warmup, seedF, seedM, world_kwargs=None, 
                       print_every: int = 500,
-                      verbose: bool = True,):
+                      verbose: bool = True,
+                      animate = True,
+                      ):
     os.makedirs(outdir, exist_ok=True)
     env = _mk_env(world_kwargs)
 
@@ -155,7 +157,7 @@ def _run_single_alpha(outdir, algo, alpha, gamma, steps, warmup, seedF, seedM, w
         json.dump(_q_to_json(aM.Q), f, indent=2)
 
     # Optional visuals
-    if MAKE_VIS:
+    if MAKE_VIS and animate:
         try:
             print("Generating visual output (May take a while) ...")
             MAKE_VIS(outdir, meta_world, aF.Q, aM.Q)
@@ -191,6 +193,9 @@ def main():
                     help="Subfolder name under outroot (default: exp3-<timestamp>)")
     ap.add_argument("--print-every", type=int, default=500, help="print progress every N steps")
     ap.add_argument("--verbose", action="store_true", help="enable console progress prints")
+    ap.add_argument("--animate", dest="animate", action="store_true", help="Generate visual/animation output")
+    ap.add_argument("--no-animate", dest="animate", action="store_false", help="Disable animation output")
+    ap.set_defaults(animate=True)
     args = ap.parse_args()
 
     if len(args.seedF) < args.runs or len(args.seedM) < args.runs:
@@ -217,6 +222,7 @@ def main():
                 seedM=args.seedM[i],
                 print_every=args.print_every,
                 verbose=True,
+                animate=args.animate,
             )
             # Per-run episode metrics
             ep = os.path.join(folder, "episodes.csv")

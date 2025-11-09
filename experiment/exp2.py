@@ -49,6 +49,7 @@ def run_single(
     world_kwargs: dict | None = None,
     print_every: int = 500,
     verbose: bool = True,
+    animate = True,
 ):
     os.makedirs(outdir, exist_ok=True)
 
@@ -65,6 +66,23 @@ def run_single(
     # On-policy SARSA agents (default policy PEXPLOIT; we override to PRANDOM during warmup)
     aF = SarsaAgent("F", alpha=alpha, gamma=gamma, seed=seedF, policy_name="PEXPLOIT")
     aM = SarsaAgent("M", alpha=alpha, gamma=gamma, seed=seedM, policy_name="PEXPLOIT")
+
+    # ---- helpers & flags ----
+    def q_to_json(qdict):
+        return {f"{list(k[0])}|{k[1]}": float(v) for k, v in qdict.items()}
+
+    def save_q_snapshot(tag: str):
+        """Save a snapshot of both agents' Q-tables with a tag in the filename."""
+        snap_dir = os.path.join(outdir, "snapshots")
+        os.makedirs(snap_dir, exist_ok=True)
+
+        with open(os.path.join(snap_dir, f"qtable_F_{tag}.json"), "w", encoding="utf-8") as f:
+            json.dump(q_to_json(aF.Q), f, indent=2)
+        with open(os.path.join(snap_dir, f"qtable_M_{tag}.json"), "w", encoding="utf-8") as f:
+            json.dump(q_to_json(aM.Q), f, indent=2)
+
+    saved_first_dropoff = False
+    saved_terminal_snapshot = False
 
     meta_world = {
         "H": env.H, "W": env.W,
@@ -114,6 +132,11 @@ def run_single(
         else:
             r, info, tr = aM.step(env, policy); action_taken = tr[1]
 
+        # (a) snapshot: first drop-off filled (5th block at first drop)
+        if (not saved_first_dropoff) and info.get("first_drop_filled", False):
+            save_q_snapshot(f"first_dropoff_filled_step{t}_ep{episode_idx}")
+            saved_first_dropoff = True
+
         log.log_step(
             step=t,
             episode=episode_idx,
@@ -124,6 +147,11 @@ def run_single(
             carry_F=int(info["carry_F"]), carry_M=int(info["carry_M"]),
             terminal=int(info["terminal"]),
         )
+
+        # (b) snapshot: first time we hit a terminal state
+        if info["terminal"] and (not saved_terminal_snapshot):
+            save_q_snapshot(f"terminal_ep{episode_idx}_step{t}")
+            saved_terminal_snapshot = True
 
         # heartbeat: print every N steps and on last step
         if verbose and (t % print_every == 0 or t == steps - 1):
@@ -147,16 +175,14 @@ def run_single(
     plot_learning_curves(ep_df, os.path.join(outdir, "learning_curve.png"))
     plot_coordination(ep_df,   os.path.join(outdir, "coordination.png"))
 
-    # Save Q-tables
-    def q_to_json(qdict):
-        return {f"{list(k[0])}|{k[1]}": float(v) for k, v in qdict.items()}
+    # (c) Save final Q-tables (whole experiment)
     with open(os.path.join(outdir, "qtable_F.json"), "w", encoding="utf-8") as f:
         json.dump(q_to_json(aF.Q), f, indent=2)
     with open(os.path.join(outdir, "qtable_M.json"), "w", encoding="utf-8") as f:
         json.dump(q_to_json(aM.Q), f, indent=2)
     
     # Optional visuals (heatmaps, quiver, overlays, animation)
-    if VIZ_OK:
+    if VIZ_OK and animate:
         print("Generating visual output (May take a while) ...", flush=True)
         make_visuals(outdir, meta_world, aF.Q, aM.Q)
 
@@ -167,6 +193,7 @@ def run_single(
         "q_F": os.path.join(outdir, "qtable_F.json"),
         "q_M": os.path.join(outdir, "qtable_M.json"),
     }
+
 
 
 def main():

@@ -75,6 +75,11 @@ def main():
                     help="Seed(s) for agent F (default: predefined list)")
     parser.add_argument("--seedM", type=int, nargs="*", default=[321, 421],
                     help="Seed(s) for agent M (default: predefined list)")
+    parser.add_argument("--animate", dest="animate", action="store_true",
+                    help="Generate visual/animation output")
+    parser.add_argument("--no-animate", dest="animate", action="store_false",
+                    help="Disable animation output")
+    parser.set_defaults(animate=True)
     args = parser.parse_args()
 
     # Default seeds
@@ -101,6 +106,7 @@ def main():
                 variant=variant,
                 seedF=seeds_F[i],
                 seedM=seeds_M[i],
+                animate=args.animate,
             )
 
     elif args.experiment == "2":
@@ -111,6 +117,7 @@ def main():
                 outdir=outdir,
                 seedF=seeds_F[i],
                 seedM=seeds_M[i],
+                animate=args.animate
             )
 
 
@@ -126,6 +133,10 @@ def main():
             "--seedF", *map(str, seeds_F),
             "--seedM", *map(str, seeds_M),
         ]
+        if args.animate:
+            sys.argv.append("--animate")
+        else:
+            sys.argv.append("--no-animate")
         print(f"Starting Experiment 3 batch. See output in {os.path.join(args.outroot, tag)}")
         run_exp3_main()
 
@@ -141,6 +152,10 @@ def main():
             "--seedF", *map(str, seeds_F),
             "--seedM", *map(str, seeds_M),
         ]
+        if args.animate:
+            sys.argv.append("--animate")
+        else:
+            sys.argv.append("--no-animate")
         print(f"Starting Experiment 4 batch. See output in {os.path.join(args.outroot, tag)}")
         run_exp4_main()
 

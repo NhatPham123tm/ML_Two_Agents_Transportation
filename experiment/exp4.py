@@ -97,7 +97,8 @@ def run_single(
     steps_cap: int = 80000,    
     world_kwargs: dict | None = None,
     print_every: int = 500,
-    verbose: bool = True,   
+    verbose: bool = True,
+    animate = True,   
 ):
     """
     Run until 6 terminal episodes; switch pickups right after the 3rd terminal.
@@ -226,7 +227,7 @@ def run_single(
         json.dump(_q_to_json(aM.Q), f, indent=2)
 
     # Optional visuals (heatmaps, quiver, overlays, animation)
-    if MAKE_VIS:
+    if MAKE_VIS and animate:
         try:
             print("Generating visual output ...", flush=True)
             MAKE_VIS(outdir, meta["world"], aF.Q, aM.Q)
@@ -270,6 +271,9 @@ def main():
     ap.add_argument("--tag", type=str, default=None, help="Batch subfolder name")
     ap.add_argument("--print-every", type=int, default=500,help="print progress every N steps")
     ap.add_argument("--verbose", action="store_true",help="enable console progress prints")
+    ap.add_argument("--animate", dest="animate", action="store_true",help="Generate visual/animation output")
+    ap.add_argument("--no-animate", dest="animate", action="store_false",help="Disable animation output")
+    ap.set_defaults(animate=True)
     args = ap.parse_args()
 
     if len(args.seedF) < args.runs or len(args.seedM) < args.runs:
@@ -298,6 +302,7 @@ def main():
             steps_cap=args.steps_cap,
             print_every=args.print_every,
             verbose=True,
+            animate=args.animate,
         )
         rows.append(res)
 

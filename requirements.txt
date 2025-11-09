@@ -19,4 +19,4 @@ plotly>=5.24
 
 # Environment
 python-dotenv>=1.0
-tkinter
+
