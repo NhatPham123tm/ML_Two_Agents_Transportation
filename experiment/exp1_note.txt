@@ -1,0 +1,11 @@
+# Variant a: PRANDOM -> PRANDOM (two runs with default seeds)
+python experiments/exp1.py --variant a
+
+# Variant b: PRANDOM -> PGREEDY
+python experiments/exp1.py --variant b
+
+# Variant c: PRANDOM -> PEXPLOIT
+python experiments/exp1.py --variant c
+
+# Customize seeds/steps if you want
+python experiments/exp1.py --variant c --runs 2 --seedF 111 222 --seedM 333 444 --steps 8000 --warmup 500
